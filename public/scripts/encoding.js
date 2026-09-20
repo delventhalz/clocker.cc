@@ -193,23 +193,23 @@ function uintToDynamicBytes(unsignedInteger, maxByteSize, minByteSize = 0) {
   return bytes.slice(from);
 }
 
-function hexToFixedBytes(hexString, byteLength) {
+function hexToFixedBytes(hexString, byteSize) {
   const sanitized = hexString
     .replaceAll(/[^0-9a-f]/gi, '')
-    .padStart(byteLength * 2, '0')
-    .slice(0, byteLength * 2);
+    .padStart(byteSize * 2, '0')
+    .slice(0, byteSize * 2);
 
   return Uint8Array.fromHex(sanitized);
 }
 
-function textToDynamicBytes(utf8String, maxByteLength) {
+function textToDynamicBytes(utf8String, maxByteSize) {
   const encoder = new TextEncoder();
-  return encoder.encode(utf8String).slice(0, maxByteLength);
+  return encoder.encode(utf8String).slice(0, maxByteSize);
 }
 
 function concatBytes(arrayOfBytes) {
-  const byteLength = arrayOfBytes.reduce((sum, bytes) => sum + bytes.length, 0);
-  const concatted = groupBytes = new Uint8Array(byteLength);
+  const size = arrayOfBytes.reduce((sum, bytes) => sum + bytes.length, 0);
+  const concatted = groupBytes = new Uint8Array(size);
   let index = 0;
 
   for (const bytes of arrayOfBytes) {
