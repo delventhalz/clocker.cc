@@ -126,11 +126,11 @@ function encodeTime(groupIndex, group, time) {
 }
 
 function msToSeconds(ms) {
-  return Math.trunc(ms / 1000);
+  return Math.floor(ms / 1000);
 }
 
 function msToMinutes(ms) {
-  return Math.trunc(ms / 60000);
+  return Math.floor(ms / 60000);
 }
 
 function clamp(value, max, min = 0) {
