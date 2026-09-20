@@ -80,13 +80,33 @@ export function encode(groups, times) {
   return bytesToBase64(concatBytes([headerBytes, ...dataBytes]));
 }
 
+/**
+ * Converts an encoded clocker string into an array of group info objects and
+ * an array of clock in/out time objects. The two arrays are returned in
+ * a tuple with group info first.
+ *
+ * Group Info object properties:
+ *   - id: UUID string formatted with the lowercase dashed convention
+ *   - color: RGB color hex string
+ *   - label: String label
+ *
+ * Clock in/out time object properties:
+ *   - group: UUID string of group time is under
+ *   - in: Clock in time as unix epoch milliseconds (rounded to nearest second)
+ *   - out: Undefined if time has not been clocked out, otherwise clock out time
+ *     as unix epoch milliseconds (rounded to nearest second)
+ */
+export function decode(encodedString) {
+
+}
+
 function encodeGroup({ id, created, color, label }) {
   const idBytes = hexToFixedBytes(id, 16);
   const createdBytes = intToFixedBytes(msToMinutes(created), 4);
   const colorBytes = hexToFixedBytes(color, 3);
   const labelBytes = textToDynamicBytes(label, 127);
 
-  const typeBits = offsetBits(GROUP_TYPE, 7);
+  const typeBits = GROUP_TYPE << 7;
   const headerBytes = new Uint8Array([typeBits + labelBytes.length]);
 
   return concatBytes([
@@ -107,10 +127,10 @@ function encodeTime(groupIndex, group, time) {
   const outSeconds = msToSeconds((time.out ?? time.in) - time.in);
   const outBytes = uintToDynamicBytes(outSeconds, 4, 1);
 
-  const typeBits = offsetBits(TIME_TYPE, 7);
-  const subTypeBits = offsetBits(TIME_SUB_TYPE, 6);
-  const indexSizeBits = offsetBits(indexBytes.length - 1, 4);
-  const inSizeBits = offsetBits(inBytes.length - 3, 2);
+  const typeBits = TIME_TYPE << 7;
+  const subTypeBits = TIME_SUB_TYPE << 6;
+  const indexSizeBits = indexBytes.length - 1 << 4;
+  const inSizeBits = inBytes.length - 3 << 2;
   const outSizeBits = outBytes.length - 1;
 
   const headerBytes = new Uint8Array([
@@ -144,10 +164,6 @@ function clampBits(value, bitSize) {
 
 function clampUnsignedBits(value, bitSize) {
   return clamp(value, 2 ** bitSize - 1);
-}
-
-function offsetBits(value, bitOffset) {
-  return value * 2 ** bitOffset;
 }
 
 function intToFixedBytes(integer, byteSize) {
