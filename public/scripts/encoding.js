@@ -356,7 +356,7 @@ function concatBits(arrayOfOffsetBits) {
 
 function concatBytes(arrayOfBytes) {
   const size = arrayOfBytes.reduce((sum, bytes) => sum + bytes.length, 0);
-  const concatted = groupBytes = new Uint8Array(size);
+  const concatted = new Uint8Array(size);
   let index = 0;
 
   for (const bytes of arrayOfBytes) {
