@@ -115,12 +115,17 @@ function encodeCheckpoint(timestamp) {
 function encodeTime(nextTimestamp, groupIndex, time) {
   const indexBytes = uintToDynamicBytes(groupIndex, 3);
 
-  const nextTsSeconds = msToSeconds(nextTimestamp);
   const inSeconds = msToSeconds(time.in);
-  const outSeconds = msToSeconds(time.out ?? time.in);
+  const inDiff = msToSeconds(nextTimestamp) - inSeconds;
 
-  const inBytes = uintToDynamicBytes(nextTsSeconds - inSeconds, MAX_CLOCK_IN_SIZE);
-  const outBytes = uintToDynamicBytes(outSeconds - inSeconds, 5, 2);
+  const outDiff = time.out === undefined
+    ? 0 // An unset out diff is always zero
+    : time.out - time.in < 1000
+    ? 1 // A set out diff must always be at least 1
+    : msToSeconds(time.out) - inSeconds;
+
+  const inBytes = uintToDynamicBytes(inDiff, MAX_CLOCK_IN_SIZE);
+  const outBytes = uintToDynamicBytes(outDiff, 5, 2);
 
   const headerBytes = concatBits([
     TIME_TYPE << 6,
