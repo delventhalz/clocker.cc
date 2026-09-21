@@ -349,6 +349,24 @@ function sliceBits(value, right, left) {
   return shifted & mask;
 }
 
+function concatBits(arrayOfOffsetBits) {
+  const byte = arrayOfOffsetBits.reduce((sum, bits) => sum + bits, 0);
+  return new Uint8Array([byte]);
+}
+
+function concatBytes(arrayOfBytes) {
+  const size = arrayOfBytes.reduce((sum, bytes) => sum + bytes.length, 0);
+  const concatted = groupBytes = new Uint8Array(size);
+  let index = 0;
+
+  for (const bytes of arrayOfBytes) {
+    concatted.set(bytes, index);
+    index += bytes.length;
+  }
+
+  return concatted;
+}
+
 function uintToDynamicBytes(positiveInteger, maxByteSize, minByteSize = 0) {
   // There is no point in using more than seven bytes with JS numbers.
   // They lose precision before you get to the eighth byte. If I need
@@ -411,24 +429,6 @@ function textToDynamicBytes(utf8String, maxByteSize) {
 function bytesToText(bytes) {
   const decoder = new TextDecoder();
   return decoder.decode(bytes);
-}
-
-function concatBits(arrayOfOffsetBits) {
-  const byte = arrayOfOffsetBits.reduce((sum, bits) => sum + bits, 0);
-  return new Uint8Array([byte]);
-}
-
-function concatBytes(arrayOfBytes) {
-  const size = arrayOfBytes.reduce((sum, bytes) => sum + bytes.length, 0);
-  const concatted = groupBytes = new Uint8Array(size);
-  let index = 0;
-
-  for (const bytes of arrayOfBytes) {
-    concatted.set(bytes, index);
-    index += bytes.length;
-  }
-
-  return concatted;
 }
 
 function bytesToBase64(bytes) {
