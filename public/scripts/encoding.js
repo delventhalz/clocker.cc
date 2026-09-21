@@ -126,7 +126,7 @@ export function decode(encodedString) {
   }
 
   if (bytes[index] !== CURRENT_FORMAT_VERSION) {
-    throw new Error(`Unkown clocker string version: ${bytes[index]}`);
+    throw new Error(`Unknown clocker string version: ${bytes[index]}`);
   }
 
   index += 1;
