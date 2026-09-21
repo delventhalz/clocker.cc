@@ -9,6 +9,8 @@ const GROUP_TYPE = 2;
 
 const MAX_CLOCK_IN_SIZE = 3;
 const MAX_SECOND_GAP = 2 ** (MAX_CLOCK_IN_SIZE * 8) - 1;
+const ID_SIZE = 16;
+const COLOR_SIZE = 3;
 
 /**
  * Encodes clock in/out times and their groups as a base64 clocker string.
@@ -94,6 +96,82 @@ export function encode(timestamp, times, groups) {
   return bytesToBase64(concatBytes(data));
 }
 
+/**
+ * Converts an encoded clocker string into a wrapper object with a timestamp,
+ * an array of clock in/out time objects, and an array of group info objects.
+ *
+ * Wrapper object properties:
+ *   - timestamp: The time the string was encoded in epoch milliseconds,
+ *     but rounded down to the nearest second
+ *   - times: An array of clock in/out time objects
+ *   - groups: An array of group info objects
+ *
+ * Clock in/out time object properties:
+ *   - group: UUID string for the group this time is a part of
+ *   - in: Clock in time as Unix epoch milliseconds (rounded to the second)
+ *   - out: Optional property which is missing if time has not been clocked out,
+ *     otherwise clock out time as epoch milliseconds (rounded to the second)
+ *
+ * Group Info object properties:
+ *   - id: UUID string formatted with the lowercase dashed convention
+ *   - color: RGB color hex string
+ *   - label: String label
+ */
+export function decode(encodedString) {
+  const bytes = base64ToBytes(encodedString);
+  let index = 0;
+
+  if (bytes.length < 2) {
+    throw new Error(`Clocker string contains too few bytes: ${bytes.length}`);
+  }
+
+  if (bytes[index] !== CURRENT_FORMAT_VERSION) {
+    throw new Error(`Unkown clocker string version: ${bytes[index]}`);
+  }
+
+  index += 1;
+  const encodeTime = decodeFromHeader(bytes, index);
+
+  if (encodeTime.type !== CHECKPOINT_TYPE) {
+    throw new Error('Clocker string missing initial timestamp');
+  }
+
+  const timestamp = encodeTime.timestamp;
+  const times = [];
+  const groups = [];
+
+  let currentTs = timestamp;
+  index += encodeTime.size;
+
+  while (index < bytes.length) {
+    const next = decodeFromHeader(bytes, index);
+    index += next.size;
+
+    if (next.type === CHECKPOINT_TYPE) {
+      currentTs = next.timestamp;
+    }
+
+    if (next.type === TIME_TYPE) {
+      currentTs -= next.inDiff;
+      times.push({
+        group: groups[next.groupIndex].id,
+        in: currentTs,
+        ...(next.outDiff === 0 ? {} : { out: currentTs + next.outDiff })
+      })
+    }
+
+    if (next.type === GROUP_TYPE) {
+      groups.push(next.group);
+    }
+  }
+
+  return {
+    timestamp,
+    times,
+    groups
+  };
+}
+
 function encodeCheckpoint(timestamp) {
   const deltaSeconds = Math.abs(msToSeconds(timestamp));
   const tsBytes = uintToDynamicBytes(deltaSeconds, 7, 4);
@@ -143,8 +221,8 @@ function encodeTime(nextTimestamp, groupIndex, time) {
 }
 
 function encodeGroup({ id, color, label }) {
-  const idBytes = hexToFixedBytes(id, 16);
-  const colorBytes = hexToFixedBytes(color, 3);
+  const idBytes = hexToFixedBytes(id, ID_SIZE);
+  const colorBytes = hexToFixedBytes(color, COLOR_SIZE);
   const labelBytes = textToDynamicBytes(label, 127);
 
   // Note that the 7-bit label size will overlap with the data type by one bit.
@@ -162,12 +240,113 @@ function encodeGroup({ id, color, label }) {
   ]);
 }
 
+function decodeFromHeader(bytes, headerIndex) {
+  const type = bytes[headerIndex] >> 6;
+
+  if (type === CHECKPOINT_TYPE) {
+    return decodeCheckpoint(bytes, headerIndex);
+  }
+
+  if (type === TIME_TYPE) {
+    return decodeTime(bytes, headerIndex);
+  }
+
+  // Left shift one and then right shift back to clear out
+  // the least bit which is ignored for this group type
+  if (type >> 1 << 1 === GROUP_TYPE) {
+    return decodeGroup(bytes, headerIndex);
+  }
+
+  throw new Error(`Unknown header data type: ${type}`);
+}
+
+function decodeCheckpoint(bytes, headerIndex) {
+  const headerByte = bytes[headerIndex];
+  const timestampSize = 4 + sliceBits(headerByte, 4, 6);
+  const timestampSign = sliceBits(headerByte, 3, 4) === 0 ? 1 : -1;
+  const size = 1 + timestampSize;
+
+  if (headerIndex + size > bytes.length) {
+    return { type: -1, size };
+  }
+
+  const timestampIndex = headerIndex + 1;
+  const end = timestampIndex + timestampSize;
+  const tsSeconds = bytesToUint(bytes.slice(timestampIndex, end));
+
+  return {
+    type: CHECKPOINT_TYPE,
+    size,
+    timestamp: timestampSign * secondsToMs(tsSeconds)
+  };
+}
+
+function decodeTime(bytes, headerIndex) {
+  const headerByte = bytes[headerIndex];
+  const groupIndexSize = sliceBits(headerByte, 4, 6);
+  const inSize = sliceBits(headerByte, 2, 4);
+  const outSize = 2 + sliceBits(headerByte, 0, 2);
+  const size = 1 + groupIndexSize + inSize + outSize;
+
+  if (headerIndex + size > bytes.length) {
+    return { type: -1, size };
+  }
+
+  const groupIndexIndex = headerIndex + 1;
+  const inIndex = groupIndexIndex + groupIndexSize;
+  const outIndex = inIndex + inSize;
+  const end = outIndex + outSize;
+
+  return {
+    type: TIME_TYPE,
+    size,
+    groupIndex: bytesToUint(bytes.slice(groupIndexIndex, inIndex)),
+    inDiff: secondsToMs(bytesToUint(bytes.slice(inIndex, outIndex))),
+    outDiff: secondsToMs(bytesToUint(bytes.slice(outIndex, end)))
+  };
+}
+
+function decodeGroup(bytes, headerIndex) {
+  const headerByte = bytes[headerIndex];
+  const labelSize = sliceBits(headerByte, 0, 7);
+  const size = 1 + ID_SIZE + COLOR_SIZE + labelSize;
+
+  if (headerIndex + size > bytes.length) {
+    return { type: -1, size };
+  }
+
+  const idIndex = headerIndex + 1;
+  const colorIndex = idIndex + ID_SIZE;
+  const labelIndex = colorIndex + COLOR_SIZE;
+  const end = labelIndex + labelSize;
+
+  return {
+    type: GROUP_TYPE,
+    size,
+    group: {
+      id: bytesToUuid(bytes.slice(idIndex, colorIndex)),
+      color: '#' + bytesToFixedHex(bytes.slice(colorIndex, labelIndex), 6),
+      label: bytesToText(bytes.slice(labelIndex, end))
+    }
+  };
+}
+
 function msToSeconds(ms) {
   return Math.floor(ms / 1000);
 }
 
+function secondsToMs(seconds) {
+  return Math.round(seconds * 1000);
+}
+
 function clamp(value, max, min = 0) {
   return Math.max(Math.min(value, max), min);
+}
+
+function sliceBits(value, right, left) {
+  const shifted = value >> right;
+  const mask = 2 ** (left - right) - 1;
+  return shifted & mask;
 }
 
 function uintToDynamicBytes(positiveInteger, maxByteSize, minByteSize = 0) {
@@ -192,6 +371,14 @@ function uintToDynamicBytes(positiveInteger, maxByteSize, minByteSize = 0) {
   return bytes.slice(from);
 }
 
+function bytesToUint(bytes) {
+  const padded = new Uint8Array(8);
+  padded.set(bytes, padded.length - bytes.length);
+  const dataView = new DataView(padded.buffer);
+  const bigInt = dataView.getBigUint64(0);
+  return Number(bigInt);
+}
+
 function hexToFixedBytes(hexString, byteSize) {
   const sanitized = hexString
     .replaceAll(/[^0-9a-f]/gi, '')
@@ -201,9 +388,29 @@ function hexToFixedBytes(hexString, byteSize) {
   return Uint8Array.fromHex(sanitized);
 }
 
+function bytesToFixedHex(bytes, hexLength) {
+  return bytes.toHex().slice(0, hexLength).padStart(hexLength, '0');
+}
+
+function bytesToUuid(bytes) {
+  const hex = bytesToFixedHex(bytes, 32);
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20)
+  ].join('-');
+}
+
 function textToDynamicBytes(utf8String, maxByteSize) {
   const encoder = new TextEncoder();
   return encoder.encode(utf8String).slice(0, maxByteSize);
+}
+
+function bytesToText(bytes) {
+  const decoder = new TextDecoder();
+  return decoder.decode(bytes);
 }
 
 function concatBits(arrayOfOffsetBits) {
@@ -226,4 +433,8 @@ function concatBytes(arrayOfBytes) {
 
 function bytesToBase64(bytes) {
   return bytes.toBase64({ alphabet: 'base64url', omitPadding: true });
+}
+
+function base64ToBytes(base64String) {
+  return Uint8Array.fromBase64(base64String, { alphabet: 'base64url' });
 }
