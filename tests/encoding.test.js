@@ -336,6 +336,58 @@ test('Encodes and decodes groups with no times', () => {
   assertSecondsEqual(decoded.times[0].out, time.out);
 });
 
+test('Drops partial times', () => {
+  const timestamp = Date.now() - mockYears();
+  const group = mockGroup();
+  const time = mockTime(group);
+
+  const encoded = encode(timestamp, [time], [group]);
+  const decoded = decode(encoded.slice(0, -3));
+
+  assertSecondsEqual(decoded.timestamp, timestamp);
+  assert.deepEqual(decoded.groups, [group]);
+  assert.deepEqual(decoded.times, []);
+});
+
+test('Drops partial groups', () => {
+  const timestamp = Date.now() - mockYears();
+  const group = mockGroup();
+
+  const encoded = encode(timestamp, [], [group]);
+  const decoded = decode(encoded.slice(0, -3));
+
+  assertSecondsEqual(decoded.timestamp, timestamp);
+  assert.deepEqual(decoded.groups, []);
+  assert.deepEqual(decoded.times, []);
+});
+
+test('Retains newest data when decoding truncated strings', () => {
+  const timestamp = Date.now() - mockYears();
+  const groups = [mockGroup({ label: 'fixed size' }), mockGroup()];
+
+  const times = [mockTime(groups[0], { in: timestamp - mockDays() })];
+  times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
+  times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
+  times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
+  times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
+  times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
+
+  const encoded = encode(timestamp, times, groups);
+
+  // Truncate part-way through second group and leave a single orphan character
+  const decoded = decode(encoded.slice(0, 81));
+
+  assertSecondsEqual(decoded.timestamp, timestamp);
+  assert.deepEqual(decoded.groups, [groups[0]]);
+  assertLength(decoded.times, 3);
+
+  for (const [i, time] of Object.entries(times.slice(0, 3))) {
+    assert.partialDeepStrictEqual(decoded.times[i], { group: time.group });
+    assertSecondsEqual(decoded.times[i].in, time.in);
+    assertSecondsEqual(decoded.times[i].out, time.out);
+  }
+});
+
 test('Throws if encoded string is too short', () => {
   const encoded = Buffer.from('00', 'hex').toString('base64url');
   assert.throws(() => decode(encoded));

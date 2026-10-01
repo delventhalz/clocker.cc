@@ -442,5 +442,8 @@ function bytesToBase64(bytes) {
 }
 
 function base64ToBytes(base64String) {
-  return Uint8Array.fromBase64(base64String, { alphabet: 'base64url' });
+  // If string was truncated, there may be a single character without padding
+  // after the last quartet. That is invalid and throws an error. Just drop it.
+  const sanitized = base64String.length % 4 === 1 ? base64String.slice(0, -1) : base64String;
+  return Uint8Array.fromBase64(sanitized, { alphabet: 'base64url' });
 }
