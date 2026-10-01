@@ -8,7 +8,7 @@ const TIME_TYPE = 1;
 const GROUP_TYPE = 2;
 
 const MAX_CLOCK_IN_SIZE = 3;
-const MAX_SECOND_GAP = 2 ** (MAX_CLOCK_IN_SIZE * 8) - 1;
+const MAX_MS_GAP = (2 ** (MAX_CLOCK_IN_SIZE * 8) - 1) * 1000;
 const ID_SIZE = 16;
 const COLOR_SIZE = 3;
 
@@ -79,7 +79,7 @@ export function encode(timestamp, times, groups) {
   }
 
   for (const time of sortedTimes) {
-    if (nextTimestamp - time.in > MAX_SECOND_GAP) {
+    if (nextTimestamp - time.in > MAX_MS_GAP) {
       data.push(encodeCheckpoint(time.in));
       nextTimestamp = time.in;
     }
