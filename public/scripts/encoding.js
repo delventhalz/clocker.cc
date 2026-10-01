@@ -59,7 +59,7 @@ export function encode(timestamp, times, groups) {
   const sortedGroups = groups.toSorted((a, b) => {
     const aIndex = sortedTimes.findIndex(time => time.group === a.id);
     const bIndex = sortedTimes.findIndex(time => time.group === b.id);
-    return aIndex - bIndex;
+    return (aIndex === -1 ? Infinity : aIndex) - (bIndex === -1 ? Infinity : bIndex);
   });
   const groupIndexesById = Object.fromEntries(sortedGroups.map((grp, i) => [grp.id, i]));
 
@@ -91,6 +91,12 @@ export function encode(timestamp, times, groups) {
 
     data.push(encodeTime(nextTimestamp, groupIndexesById[time.group], time));
     nextTimestamp = time.in;
+  }
+
+  // Push any remaining groups that don't have a corresponding time
+  while (groupIndex < sortedGroups.length) {
+    data.push(encodeGroup(sortedGroups[groupIndex]));
+    groupIndex += 1;
   }
 
   return bytesToBase64(concatBytes(data));

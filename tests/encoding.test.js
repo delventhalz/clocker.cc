@@ -320,6 +320,22 @@ test('Encodes and decodes empty arrays of groups and times', () => {
   assert.deepEqual(decoded.times, []);
 });
 
+test('Encodes and decodes groups with no times', () => {
+  const timestamp = Date.now() - mockYears();
+  const groups = [mockGroup(), mockGroup()];
+  const time = mockTime(groups[1]);
+
+  const encoded = encode(timestamp, [time], groups);
+  const decoded = decode(encoded);
+
+  assertSecondsEqual(decoded.timestamp, timestamp);
+  assert.deepEqual(decoded.groups, [groups[1], groups[0]]);
+
+  assert.partialDeepStrictEqual(decoded.times, [{ group: time.group }]);
+  assertSecondsEqual(decoded.times[0].in, time.in);
+  assertSecondsEqual(decoded.times[0].out, time.out);
+});
+
 test('Throws if encoded string is too short', () => {
   const encoded = Buffer.from('00', 'hex').toString('base64url');
   assert.throws(() => decode(encoded));
