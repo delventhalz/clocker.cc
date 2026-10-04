@@ -1,3 +1,5 @@
+import { sortTimes, sortGroups } from './sorting.js';
+
 const CURRENT_FORMAT_VERSION = 0;
 
 const CHECKPOINT_TYPE = 0;
@@ -52,15 +54,8 @@ const COLOR_SIZE = 3;
  *   - Label (0-127 bytes): A UTF-8 string label
  */
 export function encode(timestamp, times, groups) {
-  // Sort times from newest to oldest
-  const sortedTimes = times.toSorted((a, b) => b.in - a.in);
-
-  // Sort groups from newest associated time to oldest
-  const sortedGroups = groups.toSorted((a, b) => {
-    const aIndex = sortedTimes.findIndex(time => time.group === a.id);
-    const bIndex = sortedTimes.findIndex(time => time.group === b.id);
-    return (aIndex === -1 ? Infinity : aIndex) - (bIndex === -1 ? Infinity : bIndex);
-  });
+  const sortedTimes = sortTimes(times);
+  const sortedGroups = sortGroups(sortedTimes, groups);
   const groupIndexesById = Object.fromEntries(sortedGroups.map((grp, i) => [grp.id, i]));
 
   const data = [
