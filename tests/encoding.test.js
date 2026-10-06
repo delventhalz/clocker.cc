@@ -309,12 +309,12 @@ test.suite('encoding', () => {
     const groups = [];
 
     groups.push(mockGroup({ touched: timestamp - mockDays(), label: 'fixed size' }));
-    times.push(mockTime(groups[0], { in: timestamp - mockDays() }));
+    times.push(mockTime(groups[0], { in: groups[0].touched }));
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
 
     groups.push(mockGroup({ touched: times.at(-1).in - mockDays() }));
-    times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
+    times.push(mockTime(groups[1], { in: groups[1].touched - mockDays() }));
     times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
     times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
 
