@@ -180,7 +180,7 @@ function encodeCheckpoint(timestamp) {
     tsBytes.length - 4 << 4,
     // Should maybe save timestamp as signed integer, but dynamically truncating
     // two's complement numbers is a pain so I'll just use this bit as a sign
-    timestamp < 0 ? 1 : 0 << 3
+    (timestamp < 0 ? 1 : 0) << 3
   ]);
 
   return concatBytes([

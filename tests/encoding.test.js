@@ -5,6 +5,7 @@ import { encode, decode } from '../public/scripts/encoding.js';
 import {
   mockAscii,
   mockDays,
+  mockYears,
   mockTimestamp,
   mockGroup,
   mockTime
@@ -138,6 +139,19 @@ test.suite('encoding', () => {
     const timestamp = Number.MAX_SAFE_INTEGER * 1000;
     const group = mockGroup();
     const time = mockTime(group);
+
+    const encoded = encode(timestamp, [time], [group]);
+    const decoded = decode(encoded);
+
+    assert.equal(decoded.timestamp, timestamp);
+    assert.deepEqual(decoded.times, [time]);
+    assert.deepEqual(decoded.groups, [group]);
+  });
+
+  test('Encodes and decodes far past timestamps', () => {
+    const timestamp = -Number.MAX_SAFE_INTEGER * 1000 + mockYears();
+    const group = mockGroup();
+    const time = mockTime(group, { in: -Number.MAX_SAFE_INTEGER * 1000 });
 
     const encoded = encode(timestamp, [time], [group]);
     const decoded = decode(encoded);
