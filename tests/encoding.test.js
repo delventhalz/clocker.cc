@@ -35,7 +35,7 @@ function assertLength(actualArray, expectedLength) {
   );
 }
 
-test('encoding', () => {
+test.suite('encoding', () => {
   test('Encodes into a url-safe base64 string', () => {
     const group = mockGroup();
     const time = mockTime(group);

@@ -3,8 +3,8 @@ import test from 'node:test';
 import { sortTimes, sortGroups } from '../public/scripts/sorting.js';
 import { mockDays, mockGroup, mockTime } from './mocks.js';
 
-test('sorting', () => {
-  test('sortTimes', () => {
+test.suite('sorting', () => {
+  test.suite('sortTimes', () => {
     test('Sorts times by clock in', () => {
       const group = mockGroup();
       const orderedTimes = [];
@@ -87,7 +87,7 @@ test('sorting', () => {
     });
   });
 
-  test('sortGroups', () => {
+  test.suite('sortGroups', () => {
     test('Sorts groups by their times', () => {
       const groups = [
         mockGroup(),

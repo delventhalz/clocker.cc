@@ -3,7 +3,7 @@ import test from 'node:test';
 import { clockerReducer } from '../public/scripts/reducer.js';
 import { mockDays, mockGroup, mockTime } from './mocks.js';
 
-test('reducer', () => {
+test.suite('reducer', () => {
   test('Loads state', () => {
     const groups = [
       mockGroup(),
