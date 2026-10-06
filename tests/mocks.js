@@ -6,16 +6,24 @@ export function mockAscii(maxLength, minLength = 1) {
   return String.fromCharCode(...codes);
 }
 
+function roundToSecond(ms) {
+  return Math.round(Math.floor(ms / 1000) * 1000);
+}
+
 export function mockHours() {
-  return randomInt(10 * 60 * 60 * 1000);
+  return roundToSecond(randomInt(10 * 60 * 60 * 1000));
 }
 
 export function mockDays() {
-  return randomInt(10 * 24 * 60 * 60 * 1000);
+  return roundToSecond(randomInt(10 * 24 * 60 * 60 * 1000));
 }
 
 export function mockYears() {
-  return randomInt(10 * 365.25 * 24 * 60 * 60 * 1000);
+  return roundToSecond(randomInt(10 * 365.25 * 24 * 60 * 60 * 1000));
+}
+
+export function mockTimestamp() {
+  return roundToSecond(Date.now() - mockYears());
 }
 
 export function mockGroup(partial = {}) {
@@ -27,7 +35,7 @@ export function mockGroup(partial = {}) {
 }
 
 export function mockTime(group, partial = {}) {
-  const inTs = partial.in ?? Date.now() - mockYears();
+  const inTs = partial.in ?? roundToSecond(Date.now() - mockYears());
   const outTs = partial.out ?? (partial.out === null ? null : inTs + mockHours());
 
   return {
