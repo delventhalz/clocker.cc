@@ -65,6 +65,15 @@ test.suite('sorting', () => {
       const sorted = sortTimes([]);
       assert.deepEqual(sorted, []);
     });
+
+    test('Sorts years worth of times', () => {
+      const { times } = mockOrderedState({
+        times: Array(600).fill(0).map(() => ({}))
+      });
+
+      const sorted = sortTimes(times.toReversed());
+      assert.deepEqual(sorted, times);
+    });
   });
 
   test.suite('sortGroups', () => {
@@ -94,5 +103,13 @@ test.suite('sorting', () => {
       assert.deepEqual(sorted, []);
     });
 
+    test('Sorts an absurd number of groups', () => {
+      const { groups } = mockOrderedState({
+        groups: Array(600).fill(0).map(() => ({}))
+      });
+
+      const sorted = sortGroups(groups.toReversed());
+      assert.deepEqual(sorted, groups);
+    });
   });
 });

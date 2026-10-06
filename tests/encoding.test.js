@@ -319,6 +319,21 @@ test.suite('encoding', () => {
     assert.deepEqual(decoded.groups, [groups[0]]);
   });
 
+  test('Encodes and decodes years worth of data', () => {
+    const timestamp = mockTimestamp();
+    const { times, groups } = mockOrderedState({
+      times: [{ out: null }, ...Array(600).fill(0).map(() => ({}))],
+      groups: [{}, {}, {}, {}, {}, {}]
+    });
+
+    const encoded = encode(timestamp, times, groups);
+    const decoded = decode(encoded);
+
+    assert.equal(decoded.timestamp, timestamp);
+    assert.deepEqual(decoded.times, times);
+    assert.deepEqual(decoded.groups, groups);
+  });
+
   test('Throws if encoded string is too short', () => {
     const encoded = Buffer.from('00', 'hex').toString('base64url');
     assert.throws(() => decode(encoded));
