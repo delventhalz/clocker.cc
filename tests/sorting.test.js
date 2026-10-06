@@ -88,65 +88,36 @@ test.suite('sorting', () => {
   });
 
   test.suite('sortGroups', () => {
-    test('Sorts groups by their times', () => {
-      const groups = [
-        mockGroup(),
-        mockGroup(),
-        mockGroup(),
-        mockGroup()
-      ];
+    test('Sorts groups by their touched time', () => {
+      const orderedGroups = [];
+      orderedGroups.push(mockGroup({ touched: Date.now() - mockDays() }));
+      orderedGroups.push(mockGroup({ touched: orderedGroups.at(-1).touched - mockDays() }));
+      orderedGroups.push(mockGroup({ touched: orderedGroups.at(-1).touched - mockDays() }));
+      orderedGroups.push(mockGroup({ touched: orderedGroups.at(-1).touched - mockDays() }));
 
-      const sortedTimes = [
-        mockTime(groups[3]),
-        mockTime(groups[0]),
-        mockTime(groups[2]),
-        mockTime(groups[1]),
-        mockTime(groups[3]),
-        mockTime(groups[2])
-      ];
-
-      const sorted = sortGroups(sortedTimes, groups);
-
-      assert.deepEqual(sorted, [
-        groups[3],
-        groups[0],
-        groups[2],
-        groups[1]
+      const sorted = sortGroups([
+        orderedGroups[3],
+        orderedGroups[0],
+        orderedGroups[2],
+        orderedGroups[1]
       ]);
-    });
-
-    test('Sorts groups with no times at the end', () => {
-      const groups = [
-        mockGroup(),
-        mockGroup(),
-        mockGroup(),
-        mockGroup()
-      ];
-
-      const sortedTimes = [
-        mockTime(groups[2]),
-        mockTime(groups[1]),
-        mockTime(groups[2])
-      ];
-
-      const sorted = sortGroups(sortedTimes, groups);
 
       assert.deepEqual(sorted, [
-        groups[2],
-        groups[1],
-        groups[0],
-        groups[3]
+        orderedGroups[0],
+        orderedGroups[1],
+        orderedGroups[2],
+        orderedGroups[3]
       ]);
     });
 
     test('Handles an array with a single item', () => {
       const group = mockGroup();
-      const sorted = sortGroups([mockTime(group)], [group]);
+      const sorted = sortGroups([group]);
       assert.deepEqual(sorted, [group]);
     });
 
     test('Handles an empty array', () => {
-      const sorted = sortGroups([], []);
+      const sorted = sortGroups([]);
       assert.deepEqual(sorted, []);
     });
 

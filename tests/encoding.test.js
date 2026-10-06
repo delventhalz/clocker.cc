@@ -47,7 +47,12 @@ test.suite('encoding', () => {
           out: time.out + randomInt(1, 999)
         }
       ],
-      [group]);
+      [
+        {
+          ...group,
+          touched: group.touched + randomInt(1, 999)
+        }
+      ]);
     const decoded = decode(encoded);
 
     assert.equal(decoded.timestamp, timestamp);
@@ -68,10 +73,10 @@ test.suite('encoding', () => {
     assert.deepEqual(decoded.groups, [group]);
   });
 
-  test('Encodes and decodes times with a short clock in', () => {
+  test('Encodes and decodes short timestamp differences', () => {
     const timestamp = mockTimestamp();
-    const group = mockGroup();
-    const time = mockTime(group, { in: timestamp - 1000 });
+    const group = mockGroup({ touched: timestamp - 1000 });
+    const time = mockTime(group, { in: timestamp - 3000, out: timestamp - 2000 });
 
     const encoded = encode(timestamp, [time], [group]);
     const decoded = decode(encoded);
@@ -81,51 +86,24 @@ test.suite('encoding', () => {
     assert.deepEqual(decoded.groups, [group]);
   });
 
-  test('Encodes and decodes times with a short clock out', () => {
+  test('Encodes and decodes long timestamp differences', () => {
     const timestamp = mockTimestamp();
-    const inTs = timestamp - mockDays();
-    const group = mockGroup();
-    const time = mockTime(group, { in: inTs, out: inTs + 1000 });
-
-    const encoded = encode(timestamp, [time], [group]);
-    const decoded = decode(encoded);
-
-    assert.equal(decoded.timestamp, timestamp);
-    assert.deepEqual(decoded.times, [time]);
-    assert.deepEqual(decoded.groups, [group]);
-  });
-
-  test('Encodes and decodes times with a long clock in', () => {
-    const timestamp = mockTimestamp();
-    const group = mockGroup();
-    const time = mockTime(group, { in: timestamp - (2 ** 24 - 1) * 1000 });
-
-    const encoded = encode(timestamp, [time], [group]);
-    const decoded = decode(encoded);
-
-    assert.equal(decoded.timestamp, timestamp);
-    assert.deepEqual(decoded.times, [time]);
-    assert.deepEqual(decoded.groups, [group]);
-  });
-
-  test('Encodes and decodes times with a too long clock in', () => {
-    const timestamp = mockTimestamp();
-    const group = mockGroup();
-    const time = mockTime(group, { in: timestamp - 2 ** 28 * 1000 });
-
-    const encoded = encode(timestamp, [time], [group]);
-    const decoded = decode(encoded);
-
-    assert.equal(decoded.timestamp, timestamp);
-    assert.deepEqual(decoded.times, [time]);
-    assert.deepEqual(decoded.groups, [group]);
-  });
-
-  test('Encodes and decodes times with a long clock out', () => {
-    const timestamp = mockTimestamp();
-    const inTs = timestamp - mockDays();
-    const group = mockGroup();
+    const group = mockGroup({ touched: timestamp - (2 ** 24 - 1) * 1000 });
+    const inTs = group.touched - (2 ** 24 - 1) * 1000;
     const time = mockTime(group, { in: inTs, out: inTs + (2 ** 40 - 1) * 1000 });
+
+    const encoded = encode(timestamp, [time], [group]);
+    const decoded = decode(encoded);
+
+    assert.equal(decoded.timestamp, timestamp);
+    assert.deepEqual(decoded.times, [time]);
+    assert.deepEqual(decoded.groups, [group]);
+  });
+
+  test('Encodes and decodes too long timestamp differences', () => {
+    const timestamp = mockTimestamp();
+    const group = mockGroup({ touched: timestamp - (2 ** 28 - 1) * 1000 });
+    const time = mockTime(group, { in: group.touched - (2 ** 28 - 1) * 1000 });
 
     const encoded = encode(timestamp, [time], [group]);
     const decoded = decode(encoded);
@@ -176,7 +154,7 @@ test.suite('encoding', () => {
 
   test('Encodes and decodes groups with a long label', () => {
     const timestamp = mockTimestamp();
-    const group = mockGroup({ label: mockAscii(127, 127) });
+    const group = mockGroup({ label: mockAscii(255, 255) });
     const time = mockTime(group);
 
     const encoded = encode(timestamp, [time], [group]);
@@ -188,7 +166,7 @@ test.suite('encoding', () => {
   });
 
   test('Truncates a too long label', () => {
-    const label = mockAscii(1024, 128);
+    const label = mockAscii(1024, 256);
     const timestamp = mockTimestamp();
     const group = mockGroup({ label });
     const time = mockTime(group);
@@ -205,12 +183,12 @@ test.suite('encoding', () => {
         color: group.color
       }
     ]);
-    assert.equal(decoded.groups[0].label, label.slice(0, 127));
+    assert.equal(decoded.groups[0].label, label.slice(0, 255));
   });
 
   test('Encodes and decodes groups with utf8 labels', () => {
     // A lousy way to generate a UTF-8 string but it will work
-    const label = Buffer.from(randomBytes(128).toString('utf8')).slice(0, 127).toString('utf8');
+    const label = Buffer.from(randomBytes(255).toString('utf8')).slice(0, 255).toString('utf8');
     const timestamp = mockTimestamp();
     const group = mockGroup({ label });
     const time = mockTime(group);
@@ -225,15 +203,20 @@ test.suite('encoding', () => {
 
   test('Encodes and decodes many times and groups', () => {
     const timestamp = mockTimestamp();
-    const groups = [mockGroup(), mockGroup(), mockGroup()];
-
+    const groups = [];
     const times = [];
-    times.push(mockTime(groups[0], { in: timestamp - mockDays() }));
+
+    groups.push(mockGroup({ touched: timestamp - mockDays() }));
+    times.push(mockTime(groups[0]));
+    times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
+
+    groups.push(mockGroup({ touched: times.at(-1).in - mockDays() }));
+    times.push(mockTime(groups[1]));
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
     times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
-    times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
-    times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
-    times.push(mockTime(groups[2], { in: times.at(-1).in - mockDays() }));
+
+    groups.push(mockGroup({ touched: times.at(-1).in - mockDays() }));
+    times.push(mockTime(groups[2]));
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
 
     const encoded = encode(timestamp, times, groups);
@@ -246,11 +229,13 @@ test.suite('encoding', () => {
 
   test('Sorts times and groups', () => {
     const timestamp = mockTimestamp();
-    const groups = [mockGroup(), mockGroup()];
-
     const times = [];
-    times.push(mockTime(groups[0], { in: timestamp - mockDays() }));
-    times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
+    const groups = [];
+
+    groups.push(mockGroup({ touched: timestamp - mockDays() }));
+    times.push(mockTime(groups[0]));
+    groups.push(mockGroup({ touched: times.at(-1).in - mockDays() }));
+    times.push(mockTime(groups[1]));
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
     times.unshift(mockTime(groups[0], { in: times.at(-1).in - mockDays(), out: null }));
 
@@ -272,7 +257,6 @@ test.suite('encoding', () => {
     const encoded = encode(timestamp, [], []);
     const decoded = decode(encoded);
 
-
     assert.equal(decoded.timestamp, timestamp);
     assert.deepEqual(decoded.groups, []);
     assert.deepEqual(decoded.times, []);
@@ -280,7 +264,10 @@ test.suite('encoding', () => {
 
   test('Encodes and decodes groups with no times', () => {
     const timestamp = mockTimestamp();
-    const groups = [mockGroup(), mockGroup()];
+    const groups = [];
+    groups.push(mockGroup({ touched: timestamp - mockYears() }));
+    groups.push(mockGroup({ touched: groups.at(-1).touched - mockDays() }));
+    groups.push(mockGroup({ touched: groups.at(-1).touched - mockDays() }));
     const time = mockTime(groups[1]);
 
     const encoded = encode(timestamp, [time], groups);
@@ -288,7 +275,7 @@ test.suite('encoding', () => {
 
     assert.equal(decoded.timestamp, timestamp);
     assert.deepEqual(decoded.times, [time]);
-    assert.deepEqual(decoded.groups, [groups[1], groups[0]]);
+    assert.deepEqual(decoded.groups, groups);
   });
 
   test('Drops partial times', () => {
@@ -318,12 +305,15 @@ test.suite('encoding', () => {
 
   test('Retains newest data when decoding truncated strings', () => {
     const timestamp = mockTimestamp();
-    const groups = [mockGroup({ label: 'fixed size' }), mockGroup()];
-
     const times = [];
+    const groups = [];
+
+    groups.push(mockGroup({ touched: timestamp - mockDays(), label: 'fixed size' }));
     times.push(mockTime(groups[0], { in: timestamp - mockDays() }));
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
+
+    groups.push(mockGroup({ touched: times.at(-1).in - mockDays() }));
     times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
     times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
     times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
@@ -344,18 +334,25 @@ test.suite('encoding', () => {
   });
 
   test('Throws if encoded version is unknown', () => {
-    const encoded = Buffer.from('ff00ffffffff', 'hex').toString('base64url');
+    const encoded = Buffer.from('ff' + '00ffffffff', 'hex').toString('base64url');
     assert.throws(() => decode(encoded));
   });
 
   test('Throws if initial checkpoint is truncated', () => {
-    const encoded = Buffer.from('0000ffff', 'hex').toString('base64url');
+    const encoded = Buffer.from('00' + '00ffff', 'hex').toString('base64url');
     assert.throws(() => decode(encoded));
   });
 
   test('Throws if initial checkpoint is missing', () => {
     // Correct version followed immediately by a valid group
-    const byteString = '008061cade67be254c08ac11489cb2a9672900ff00';
+    const byteString = '00' + '8061cade67be254c08ac11489cb2a9672900ff00';
+    const encoded = Buffer.from(byteString, 'hex').toString('base64url');
+    assert.throws(() => decode(encoded));
+  });
+
+  test('Throws if passed an unrecognized header type', () => {
+    // Valid version and checkpoint followed by a header type 3
+    const byteString = '00' + '00ffffffff' + 'c0ffffffff';
     const encoded = Buffer.from(byteString, 'hex').toString('base64url');
     assert.throws(() => decode(encoded));
   });

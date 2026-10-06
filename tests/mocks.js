@@ -29,14 +29,24 @@ export function mockTimestamp() {
 export function mockGroup(partial = {}) {
   return {
     id: partial.id ?? randomUUID(),
+    touched: partial.touched ?? mockTimestamp(),
     color: partial.color ?? '#' + randomBytes(3).toString('hex'),
     label: partial.label ?? mockAscii(127)
   };
 }
 
 export function mockTime(group, partial = {}) {
-  const inTs = partial.in ?? roundToSecond(Date.now() - mockYears());
-  const outTs = partial.out ?? (partial.out === null ? null : inTs + mockHours());
+  const outTs = partial.out !== undefined
+    ? partial.out
+    : partial.in !== undefined
+    ? partial.in + mockHours()
+    : group.touched;
+
+  const inTs = typeof partial.in === 'number'
+    ? partial.in
+    : outTs !== null
+    ? outTs - mockHours()
+    : group.touched;
 
   return {
     group: group.id,

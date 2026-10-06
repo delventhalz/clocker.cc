@@ -14,12 +14,8 @@ export function sortTimes(times) {
 }
 
 /**
- * Sort groups from first associated time to last
+ * Sort groups starting from most recently updated or clocked in/out
  */
-export function sortGroups(sortedTimes, groups) {
-  return groups.toSorted((a, b) => {
-    const aIndex = sortedTimes.findIndex(time => time.group === a.id);
-    const bIndex = sortedTimes.findIndex(time => time.group === b.id);
-    return (aIndex === -1 ? Infinity : aIndex) - (bIndex === -1 ? Infinity : bIndex);
-  });
+export function sortGroups(groups) {
+  return groups.toSorted((a, b) => b.touched - a.touched);
 }

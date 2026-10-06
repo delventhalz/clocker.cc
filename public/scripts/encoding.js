@@ -4,13 +4,10 @@ const CURRENT_FORMAT_VERSION = 0;
 
 const CHECKPOINT_TYPE = 0;
 const TIME_TYPE = 1;
-
-// Note that since groups cheat and use seven bits for label size,
-// they effectively have a data type of BOTH 2 and 3
 const GROUP_TYPE = 2;
 
-const MAX_CLOCK_IN_SIZE = 3;
-const MAX_MS_GAP = (2 ** (MAX_CLOCK_IN_SIZE * 8) - 1) * 1000;
+const MAX_TIME_GAP_SIZE = 3;
+const MAX_MS_GAP = (2 ** (MAX_TIME_GAP_SIZE * 8) - 1) * 1000;
 const ID_SIZE = 16;
 const COLOR_SIZE = 3;
 
@@ -47,17 +44,36 @@ const COLOR_SIZE = 3;
  *   - Clock Out (2-5 bytes): Seconds since this clock in
  *
  * Group info byte format:
- *   - Header (1 byte):
- *     - Data Type (1 bit): Always one (i.e. 2 or 3 when sized as two bits)
- *     - Label Size (7 bits): Byte size of string label (0-127)
+ *   - Header (2 bytes):
+ *     - Data Type (2 bits): Always two
+ *     - Touched size (2 bits): Byte size of touched timestamp (0-3)
+ *     - Unused (4 bits): Zeroed out, may be used for future metadata
+ *     - Label Size (8 bits): Byte size of string label (0-255)
  *   - UUID (16 bytes)
+ *   - Touched Time (0-3 bytes): Seconds before preceding clock in or checkpoint
  *   - Color (3 bytes): RGB color
- *   - Label (0-127 bytes): A UTF-8 string label
+ *   - Label (0-255 bytes): A UTF-8 string label
  */
 export function encode(timestamp, times, groups) {
   const sortedTimes = sortTimes(times);
-  const sortedGroups = sortGroups(sortedTimes, groups);
+  const sortedGroups = sortGroups(groups);
   const groupIndexesById = Object.fromEntries(sortedGroups.map((grp, i) => [grp.id, i]));
+
+  const queue = [];
+  let timeIndex = 0;
+  let groupIndex = 0;
+
+  while (timeIndex < sortedTimes.length || groupIndex < sortedGroups.length) {
+    const time = sortedTimes[timeIndex];
+    const group = sortedGroups[groupIndex];
+    if (!time || (group && group.touched >= time.in)) {
+      queue.push(group);
+      groupIndex += 1;
+    } else  {
+      queue.push(time);
+      timeIndex += 1
+    }
+  }
 
   const data = [
     new Uint8Array([CURRENT_FORMAT_VERSION]),
@@ -66,30 +82,24 @@ export function encode(timestamp, times, groups) {
 
   // This is "next" as in next chronologically. It comes *before* in list order.
   let nextTimestamp = timestamp;
-  let groupIndex = 0;
 
-  for (const time of sortedTimes) {
-    // If this the first time or if it is the first clocked out time, it is
-    // possible it will be from after the "next" timestamp. If that is the case,
-    // or if the gap between timestamps is too large, we need a new checkpoint.
-    if (time.in > nextTimestamp || nextTimestamp - time.in > MAX_MS_GAP) {
-      data.push(encodeCheckpoint(time.in));
-      nextTimestamp = time.in;
+  for (const record of queue) {
+    const ts = record.in ?? record.touched;
+
+    // If this timestamp is after the "next" timestamp, or if the gap
+    // between timestamps is too large, we need a new checkpoint
+    if (ts > nextTimestamp || nextTimestamp - ts > MAX_MS_GAP) {
+      data.push(encodeCheckpoint(ts));
+      nextTimestamp = ts;
     }
 
-    if (groupIndex < sortedGroups.length && time.group === sortedGroups[groupIndex].id) {
-      data.push(encodeGroup(sortedGroups[groupIndex]));
-      groupIndex += 1;
+    if (record.id) {
+      data.push(encodeGroup(nextTimestamp, record));
+      nextTimestamp = record.touched;
+    } else {
+      data.push(encodeTime(nextTimestamp, groupIndexesById[record.group], record));
+      nextTimestamp = record.in;
     }
-
-    data.push(encodeTime(nextTimestamp, groupIndexesById[time.group], time));
-    nextTimestamp = time.in;
-  }
-
-  // Push any remaining groups that don't have a corresponding time
-  while (groupIndex < sortedGroups.length) {
-    data.push(encodeGroup(sortedGroups[groupIndex]));
-    groupIndex += 1;
   }
 
   return bytesToBase64(concatBytes(data));
@@ -113,6 +123,8 @@ export function encode(timestamp, times, groups) {
  *
  * Group Info object properties:
  *   - id: UUID string formatted with the lowercase dashed convention
+ *   - touched: The latest time the group was edited or clocked in/out in
+ *     epoch milliseconds, but rounded down to the nearest second
  *   - color: RGB color hex string
  *   - label: String label
  */
@@ -160,7 +172,13 @@ export function decode(encodedString) {
     }
 
     if (next.type === GROUP_TYPE) {
-      groups.push(next.group);
+      currentTs -= next.touchedDiff;
+      groups.push({
+        id: next.id,
+        touched: currentTs,
+        color: next.color,
+        label: next.label
+      });
     }
   }
 
@@ -201,7 +219,7 @@ function encodeTime(nextTimestamp, groupIndex, time) {
     ? 1 // A set out diff must always be at least 1
     : msToSeconds(time.out) - inSeconds;
 
-  const inBytes = uintToDynamicBytes(inDiff, MAX_CLOCK_IN_SIZE);
+  const inBytes = uintToDynamicBytes(inDiff, MAX_TIME_GAP_SIZE);
   const outBytes = uintToDynamicBytes(outDiff, 5, 2);
 
   const headerBytes = concatBits([
@@ -219,21 +237,26 @@ function encodeTime(nextTimestamp, groupIndex, time) {
   ]);
 }
 
-function encodeGroup({ id, color, label }) {
+function encodeGroup(nextTimestamp, { id, touched, color, label }) {
   const idBytes = hexToFixedBytes(id, ID_SIZE);
   const colorBytes = hexToFixedBytes(color, COLOR_SIZE);
-  const labelBytes = textToDynamicBytes(label, 127);
+  const labelBytes = textToDynamicBytes(label, 255);
 
-  // Note that the 7-bit label size will overlap with the data type by one bit.
-  // This only works because GROUP_TYPE is a number with a zero in the last bit.
-  const headerBytes = concatBits([
+  const touchedSeconds = msToSeconds(touched);
+  const touchedDiff = msToSeconds(nextTimestamp) - touchedSeconds;
+  const touchedBytes = uintToDynamicBytes(touchedDiff, MAX_TIME_GAP_SIZE);
+
+  const firstHeaderBytes = concatBits([
     GROUP_TYPE << 6,
-    labelBytes.length
+    touchedBytes.length << 4
   ]);
+  const restHeaderBytes = new Uint8Array([labelBytes.length]);
 
   return concatBytes([
-    headerBytes,
+    firstHeaderBytes,
+    restHeaderBytes,
     idBytes,
+    touchedBytes,
     colorBytes,
     labelBytes
   ]);
@@ -250,9 +273,7 @@ function decodeFromHeader(bytes, headerIndex) {
     return decodeTime(bytes, headerIndex);
   }
 
-  // Left shift one and then right shift back to clear out
-  // the least bit which is ignored for this group type
-  if (type >> 1 << 1 === GROUP_TYPE) {
+  if (type === GROUP_TYPE) {
     return decodeGroup(bytes, headerIndex);
   }
 
@@ -306,27 +327,28 @@ function decodeTime(bytes, headerIndex) {
 }
 
 function decodeGroup(bytes, headerIndex) {
-  const headerByte = bytes[headerIndex];
-  const labelSize = sliceBits(headerByte, 0, 7);
-  const size = 1 + ID_SIZE + COLOR_SIZE + labelSize;
+  const firstHeaderByte = bytes[headerIndex];
+  const touchedSize = sliceBits(firstHeaderByte, 4, 6);
+  const labelSize = bytes[headerIndex + 1];
+  const size = 2 + ID_SIZE + touchedSize + COLOR_SIZE + labelSize;
 
   if (headerIndex + size > bytes.length) {
     return { type: -1, size };
   }
 
-  const idIndex = headerIndex + 1;
-  const colorIndex = idIndex + ID_SIZE;
+  const idIndex = headerIndex + 2;
+  const touchedIndex = idIndex + ID_SIZE;
+  const colorIndex = touchedIndex + touchedSize;
   const labelIndex = colorIndex + COLOR_SIZE;
   const end = labelIndex + labelSize;
 
   return {
     type: GROUP_TYPE,
     size,
-    group: {
-      id: bytesToUuid(bytes.slice(idIndex, colorIndex)),
-      color: '#' + bytesToFixedHex(bytes.slice(colorIndex, labelIndex), 6),
-      label: bytesToText(bytes.slice(labelIndex, end))
-    }
+    id: bytesToUuid(bytes.slice(idIndex, colorIndex)),
+    touchedDiff: secondsToMs(bytesToUint(bytes.slice(touchedIndex, colorIndex))),
+    color: '#' + bytesToFixedHex(bytes.slice(colorIndex, labelIndex), 6),
+    label: bytesToText(bytes.slice(labelIndex, end))
   };
 }
 
