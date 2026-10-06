@@ -28,6 +28,35 @@ test('sorting', () => {
       ]);
     });
 
+    test('Sorts active times with no clock out first', () => {
+      const group = mockGroup();
+      const orderedTimes = [];
+      orderedTimes.push(mockTime(group, { in: Date.now() - mockDays() }));
+      orderedTimes.push(mockTime(group, { in: orderedTimes.at(-1).in - mockDays() }));
+      orderedTimes.push(mockTime(group, { in: orderedTimes.at(-1).in - mockDays(), out: null }));
+      orderedTimes.push(mockTime(group, { in: orderedTimes.at(-1).in - mockDays() }));
+      orderedTimes.push(mockTime(group, { in: orderedTimes.at(-1).in - mockDays(), out: null }));
+      orderedTimes.push(mockTime(group, { in: orderedTimes.at(-1).in - mockDays() }));
+
+      const sorted = sortTimes([
+        orderedTimes[3],
+        orderedTimes[1],
+        orderedTimes[4],
+        orderedTimes[5],
+        orderedTimes[0],
+        orderedTimes[2]
+      ]);
+
+      assert.deepEqual(sorted, [
+        orderedTimes[2],
+        orderedTimes[4],
+        orderedTimes[0],
+        orderedTimes[1],
+        orderedTimes[3],
+        orderedTimes[5]
+      ]);
+    });
+
     test('Maintains order when timestamps are the same', () => {
       const inTs = Date.now() - mockDays();
       const times = [

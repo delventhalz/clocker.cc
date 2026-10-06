@@ -231,7 +231,8 @@ test('encoding', () => {
     const timestamp = Date.now() - mockYears();
     const groups = [mockGroup(), mockGroup(), mockGroup()];
 
-    const times = [mockTime(groups[0], { in: timestamp - mockDays() })];
+    const times = [];
+    times.push(mockTime(groups[0], { in: timestamp - mockDays() }));
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
     times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
@@ -253,14 +254,15 @@ test('encoding', () => {
     }
   });
 
-  test('Orders times and groups', () => {
+  test('Sorts times and groups', () => {
     const timestamp = Date.now() - mockYears();
     const groups = [mockGroup(), mockGroup()];
 
-    const times = [mockTime(groups[0], { in: timestamp - mockDays() })];
-    times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
+    const times = [];
+    times.push(mockTime(groups[0], { in: timestamp - mockDays() }));
     times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
+    times.unshift(mockTime(groups[0], { in: times.at(-1).in - mockDays(), out: null }));
 
     const encoded = encode(
       timestamp,
@@ -276,7 +278,11 @@ test('encoding', () => {
     for (const [i, time] of Object.entries(times)) {
       assert.partialDeepStrictEqual(decoded.times[i], { group: time.group });
       assertSecondsEqual(decoded.times[i].in, time.in);
-      assertSecondsEqual(decoded.times[i].out, time.out);
+      if (times[i].out === undefined) {
+        assert.equal(decoded.times[i].out, undefined);
+      } else {
+        assertSecondsEqual(decoded.times[i].out, time.out);
+      }
     }
   });
 
@@ -337,7 +343,8 @@ test('encoding', () => {
     const timestamp = Date.now() - mockYears();
     const groups = [mockGroup({ label: 'fixed size' }), mockGroup()];
 
-    const times = [mockTime(groups[0], { in: timestamp - mockDays() })];
+    const times = [];
+    times.push(mockTime(groups[0], { in: timestamp - mockDays() }));
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
     times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));

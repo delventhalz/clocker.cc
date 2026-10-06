@@ -1,8 +1,16 @@
 /**
- * Sort times from newest to oldest
+ * Sort times from newest to oldest, with active times before clocked out times
  */
 export function sortTimes(times) {
-  return times.toSorted((a, b) => b.in - a.in);
+  return times.toSorted((a, b) => {
+    if (a.out === undefined && b.out !== undefined) {
+      return -1;
+    }
+    if (a.out !== undefined && b.out === undefined) {
+      return 1;
+    }
+    return b.in - a.in;
+  });
 }
 
 /**

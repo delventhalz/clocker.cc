@@ -21,11 +21,12 @@ const COLOR_SIZE = 3;
  * number, followed by an absolute checkpoint timestamp from the time the string
  * was encoded. After this initial metadata, there is an interspersed list of
  * clock in/out times, group info, and additional checkpoints. These are ordered
- * from newest to oldest, with each group coming just before the first time that
- * references it, and checkpoints coming before times which are more than 2^24
- * seconds apart. In this way, clocker strings can be truncated at any point to
- * fit size requirements, such as for a URL query string. The oldest data can
- * simply be dropped without generating errors.
+ * from newest to oldest, with active times coming before clocked out times,
+ * with each group coming just before the first time that references it, and
+ * checkpoints coming before times which are more than 2^24 seconds apart.
+ * In this way, clocker strings can be truncated at any point to fit size
+ * requirements, such as for a URL query string. The oldest data can simply be
+ * dropped without generating errors.
  *
  * Checkpoint timestamp byte format:
  *   - Header (1 byte):
@@ -63,18 +64,15 @@ export function encode(timestamp, times, groups) {
     encodeCheckpoint(timestamp),
   ];
 
+  // This is "next" as in next chronologically. It comes *before* in list order.
   let nextTimestamp = timestamp;
   let groupIndex = 0;
 
-  // If first clock in time is from after our encode timestamp,
-  // we need a future checkpoint to match
-  if (sortedTimes[0] && sortedTimes[0].in > nextTimestamp) {
-    data.push(encodeCheckpoint(sortedTimes[0].in));
-    nextTimestamp = sortedTimes[0].in;
-  }
-
   for (const time of sortedTimes) {
-    if (nextTimestamp - time.in > MAX_MS_GAP) {
+    // If this the first time or if it is the first clocked out time, it is
+    // possible it will be from after the "next" timestamp. If that is the case,
+    // or if the gap between timestamps is too large, we need a new checkpoint.
+    if (time.in > nextTimestamp || nextTimestamp - time.in > MAX_MS_GAP) {
       data.push(encodeCheckpoint(time.in));
       nextTimestamp = time.in;
     }
