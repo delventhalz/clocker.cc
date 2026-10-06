@@ -1,60 +1,40 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { sortTimes, sortGroups } from '../public/scripts/sorting.js';
-import { mockDays, mockGroup, mockTime } from './mocks.js';
+import { mockDays, mockGroup, mockTime, mockOrderedState } from './mocks.js';
 
 test.suite('sorting', () => {
   test.suite('sortTimes', () => {
     test('Sorts times by clock in', () => {
-      const group = mockGroup();
-      const orderedTimes = [];
-      orderedTimes.push(mockTime(group, { in: Date.now() - mockDays() }));
-      orderedTimes.push(mockTime(group, { in: orderedTimes.at(-1).in - mockDays() }));
-      orderedTimes.push(mockTime(group, { in: orderedTimes.at(-1).in - mockDays() }));
-      orderedTimes.push(mockTime(group, { in: orderedTimes.at(-1).in - mockDays() }));
+      const { times } = mockOrderedState({
+        times: [{}, {}, {}, {}]
+      });
 
       const sorted = sortTimes([
-        orderedTimes[3],
-        orderedTimes[1],
-        orderedTimes[0],
-        orderedTimes[2]
+        times[3],
+        times[1],
+        times[0],
+        times[2]
       ]);
 
-      assert.deepEqual(sorted, [
-        orderedTimes[0],
-        orderedTimes[1],
-        orderedTimes[2],
-        orderedTimes[3]
-      ]);
+      assert.deepEqual(sorted, times);
     });
 
     test('Sorts active times with no clock out first', () => {
-      const group = mockGroup();
-      const orderedTimes = [];
-      orderedTimes.push(mockTime(group, { in: Date.now() - mockDays() }));
-      orderedTimes.push(mockTime(group, { in: orderedTimes.at(-1).in - mockDays() }));
-      orderedTimes.push(mockTime(group, { in: orderedTimes.at(-1).in - mockDays(), out: null }));
-      orderedTimes.push(mockTime(group, { in: orderedTimes.at(-1).in - mockDays() }));
-      orderedTimes.push(mockTime(group, { in: orderedTimes.at(-1).in - mockDays(), out: null }));
-      orderedTimes.push(mockTime(group, { in: orderedTimes.at(-1).in - mockDays() }));
+      const { times } = mockOrderedState({
+        times: [{}, {}, { out: null }, {}, { out: null }, {}]
+      });
 
       const sorted = sortTimes([
-        orderedTimes[3],
-        orderedTimes[1],
-        orderedTimes[4],
-        orderedTimes[5],
-        orderedTimes[0],
-        orderedTimes[2]
+        times[3],
+        times[1],
+        times[4],
+        times[5],
+        times[0],
+        times[2]
       ]);
 
-      assert.deepEqual(sorted, [
-        orderedTimes[2],
-        orderedTimes[4],
-        orderedTimes[0],
-        orderedTimes[1],
-        orderedTimes[3],
-        orderedTimes[5]
-      ]);
+      assert.deepEqual(sorted, times);
     });
 
     test('Maintains order when timestamps are the same', () => {
@@ -89,25 +69,18 @@ test.suite('sorting', () => {
 
   test.suite('sortGroups', () => {
     test('Sorts groups by their touched time', () => {
-      const orderedGroups = [];
-      orderedGroups.push(mockGroup({ touched: Date.now() - mockDays() }));
-      orderedGroups.push(mockGroup({ touched: orderedGroups.at(-1).touched - mockDays() }));
-      orderedGroups.push(mockGroup({ touched: orderedGroups.at(-1).touched - mockDays() }));
-      orderedGroups.push(mockGroup({ touched: orderedGroups.at(-1).touched - mockDays() }));
+      const { groups } = mockOrderedState({
+        groups: [{}, {}, {}, {}]
+      });
 
       const sorted = sortGroups([
-        orderedGroups[3],
-        orderedGroups[0],
-        orderedGroups[2],
-        orderedGroups[1]
+        groups[3],
+        groups[0],
+        groups[2],
+        groups[1]
       ]);
 
-      assert.deepEqual(sorted, [
-        orderedGroups[0],
-        orderedGroups[1],
-        orderedGroups[2],
-        orderedGroups[3]
-      ]);
+      assert.deepEqual(sorted, groups);
     });
 
     test('Handles an array with a single item', () => {

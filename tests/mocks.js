@@ -54,3 +54,67 @@ export function mockTime(group, partial = {}) {
     ...(outTs === null ? {} : { out: outTs })
   };
 }
+
+export function mockOrderedState(options = {}) {
+  const {
+    start = mockTimestamp(),
+    times = [{}, {}, {}, {}, {}],
+    groups = [{}, {}, {}]
+  } = options;
+
+  const orderedTimes = [];
+  const orderedGroups = [];
+
+  if (groups.length > 0) {
+    orderedGroups.push(mockGroup({ touched: start, ...groups[0] }));
+  }
+  if (times.length > 0) {
+    const partialTime = {
+      in: orderedGroups[0].touched,
+      ...times[0]
+    };
+    orderedTimes.push(mockTime(orderedGroups[0], partialTime));
+  }
+
+  // Any extra times get assigned to first group
+  while (orderedTimes.length <= times.length - groups.length) {
+    const partialTime = {
+      in: orderedTimes.at(-1).in - mockDays(),
+      ...times[orderedTimes.length]
+    };
+    orderedTimes.push(mockTime(orderedGroups[0], partialTime));
+  }
+
+  // Final times each get their own group
+  while (orderedTimes.length < times.length) {
+    const partialGroup = {
+      touched: orderedTimes.at(-1).in - mockDays(),
+      ...groups[orderedGroups.length]
+    };
+    orderedGroups.push(mockGroup(partialGroup));
+
+    const partialTime = {
+      in: orderedGroups.at(-1).touched,
+      ...times[orderedTimes.length]
+    };
+    orderedTimes.push(mockTime(orderedGroups.at(-1), partialTime));
+  }
+
+  // Any extra groups get no time
+  while (orderedGroups.length < groups.length) {
+    const partialGroup = {
+      touched: orderedGroups.at(-1).touched - mockDays(),
+      ...groups[orderedGroups.length]
+    };
+    orderedGroups.push(mockGroup(partialGroup));
+  }
+
+  return {
+    times: [
+      // Regardless of "in" timestamp, times with no clock out go first
+      ...orderedTimes.filter(t => t.out === undefined),
+      ...orderedTimes.filter(t => t.out !== undefined)
+    ],
+    groups: orderedGroups
+  }
+}

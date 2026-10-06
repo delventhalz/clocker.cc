@@ -5,38 +5,74 @@ export function clockerReducer(state, action) {
   case 'LOAD_STATE':
     return {
       ...state,
-      times: action.payload.times,
-      groups: action.payload.groups
+      times: sortTimes(action.payload.times),
+      groups: sortGroups(action.payload.groups)
     };
 
   case 'CLOCK_IN':
     return {
       ...state,
-      times: [makeTime(action.payload), ...state.times]
+      times: sortTimes([makeTime(action.payload), ...state.times]),
+      groups: touchGroup(state.groups, action.payload.group, action.payload.in)
     };
 
   case 'CLOCK_OUT':
-    return {
-      ...state,
-      times: clockOutTimeAtIndex(state.times, action.payload)
-    };
+    return clockOutTime(state, action.payload.index, action.payload.out);
 
   case 'ADD_GROUP':
     return {
       ...state,
-      groups: [action.payload, ...state.groups]
+      groups: sortGroups([makeGroup(action.payload), ...state.groups])
     };
   }
 }
 
 function makeTime(time) {
-  return { group: time.group, in: time.in };
+  return {
+    group: time.group,
+    in: roundToSecond(time.in)
+  };
 }
 
-function clockOutTimeAtIndex(times, { index, out }) {
-  return [
-    ...times.slice(0, index),
-    { ...times[index], out },
-    ...times.slice(index + 1)
-  ];
+function makeGroup(group) {
+  return {
+    id: group.id,
+    touched: roundToSecond(group.touched),
+    color: group.color,
+    label: group.label
+  };
+}
+
+function clockOutTime(state, timeIndex, out) {
+  const time = state.times[timeIndex];
+  if (!time || time.out !== undefined) {
+    return state;
+  }
+
+  return {
+    times: sortTimes([
+      { ...time, out: roundToSecond(out) },
+      ...state.times.slice(0, timeIndex),
+      ...state.times.slice(timeIndex + 1)
+    ]),
+    groups: touchGroup(state.groups, time.group, out)
+  };
+}
+
+function touchGroup(groups, groupId, touched) {
+  const groupIndex = groups.findIndex(grp => grp.id === groupId);
+
+  if (groupIndex === -1) {
+    return groups;
+  }
+
+  return sortGroups([
+    { ...groups[groupIndex], touched: roundToSecond(touched) },
+    ...groups.slice(0, groupIndex),
+    ...groups.slice(groupIndex + 1),
+  ]);
+}
+
+function roundToSecond(ms) {
+  return Math.round(Math.floor(ms / 1000) * 1000);
 }

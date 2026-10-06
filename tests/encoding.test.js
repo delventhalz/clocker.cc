@@ -8,7 +8,8 @@ import {
   mockYears,
   mockTimestamp,
   mockGroup,
-  mockTime
+  mockTime,
+  mockOrderedState
 } from './mocks.js';
 
 test.suite('encoding', () => {
@@ -203,20 +204,12 @@ test.suite('encoding', () => {
 
   test('Encodes and decodes many times and groups', () => {
     const timestamp = mockTimestamp();
-    const groups = [];
-    const times = [];
 
-    groups.push(mockGroup({ touched: timestamp - mockDays() }));
-    times.push(mockTime(groups[0]));
-    times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
-
-    groups.push(mockGroup({ touched: times.at(-1).in - mockDays() }));
-    times.push(mockTime(groups[1]));
+    const { times, groups } = mockOrderedState({
+      start: timestamp - mockDays()
+    });
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
     times.push(mockTime(groups[1], { in: times.at(-1).in - mockDays() }));
-
-    groups.push(mockGroup({ touched: times.at(-1).in - mockDays() }));
-    times.push(mockTime(groups[2]));
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
 
     const encoded = encode(timestamp, times, groups);
@@ -229,15 +222,13 @@ test.suite('encoding', () => {
 
   test('Sorts times and groups', () => {
     const timestamp = mockTimestamp();
-    const times = [];
-    const groups = [];
 
-    groups.push(mockGroup({ touched: timestamp - mockDays() }));
-    times.push(mockTime(groups[0]));
-    groups.push(mockGroup({ touched: times.at(-1).in - mockDays() }));
-    times.push(mockTime(groups[1]));
+    const { times, groups } = mockOrderedState({
+      start: timestamp - mockDays(),
+      times: [{}, { out: null }, {}],
+      groups: [{}, {}]
+    });
     times.push(mockTime(groups[0], { in: times.at(-1).in - mockDays() }));
-    times.unshift(mockTime(groups[0], { in: times.at(-1).in - mockDays(), out: null }));
 
     const encoded = encode(
       timestamp,
