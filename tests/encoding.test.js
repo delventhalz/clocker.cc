@@ -97,7 +97,20 @@ test.suite('encoding', () => {
   test('Encodes and decodes times with a long clock in', () => {
     const timestamp = mockTimestamp();
     const group = mockGroup();
-    const time = mockTime(group, { in: timestamp - (2 ** 24 + 1) * 1000 });
+    const time = mockTime(group, { in: timestamp - (2 ** 24 - 1) * 1000 });
+
+    const encoded = encode(timestamp, [time], [group]);
+    const decoded = decode(encoded);
+
+    assert.equal(decoded.timestamp, timestamp);
+    assert.deepEqual(decoded.times, [time]);
+    assert.deepEqual(decoded.groups, [group]);
+  });
+
+  test('Encodes and decodes times with a too long clock in', () => {
+    const timestamp = mockTimestamp();
+    const group = mockGroup();
+    const time = mockTime(group, { in: timestamp - 2 ** 28 * 1000 });
 
     const encoded = encode(timestamp, [time], [group]);
     const decoded = decode(encoded);
