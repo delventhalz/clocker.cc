@@ -350,6 +350,13 @@ test.suite('encoding', () => {
     assert.throws(() => decode(encoded));
   });
 
+  test('Throws if group is missing', () => {
+    // Valid version and checkpoint followed immediately by a clock in
+    const byteString = '00' + '00ffffffff' + '400000';
+    const encoded = Buffer.from(byteString, 'hex').toString('base64url');
+    assert.throws(() => decode(encoded));
+  });
+
   test('Throws if passed an unrecognized header type', () => {
     // Valid version and checkpoint followed by a header type 3
     const byteString = '00' + '00ffffffff' + 'c0ffffffff';

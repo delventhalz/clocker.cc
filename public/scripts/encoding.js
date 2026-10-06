@@ -133,18 +133,18 @@ export function decode(encodedString) {
   let index = 0;
 
   if (bytes.length < 2) {
-    throw new Error(`Clocker string contains too few bytes: ${bytes.length}`);
+    throw new Error(`[Clocker Invalid] Too few bytes: ${bytes.length}`);
   }
 
   if (bytes[index] !== CURRENT_FORMAT_VERSION) {
-    throw new Error(`Unknown clocker string version: ${bytes[index]}`);
+    throw new Error(`[Clocker Invalid] Unknown version: ${bytes[index]}`);
   }
 
   index += 1;
   const encodeTime = decodeFromHeader(bytes, index);
 
   if (encodeTime.type !== CHECKPOINT_TYPE) {
-    throw new Error('Clocker string missing initial timestamp');
+    throw new Error('[Clocker Invalid]: Missing initial timestamp');
   }
 
   const timestamp = encodeTime.timestamp;
@@ -163,12 +163,16 @@ export function decode(encodedString) {
     }
 
     if (next.type === TIME_TYPE) {
+      if (!groups[next.groupIndex]) {
+        throw new Error(`[Clocker Invalid] Missing nth group: ${next.groupIndex}`);
+      }
+
       currentTs -= next.inDiff;
       times.push({
         group: groups[next.groupIndex].id,
         in: currentTs,
         ...(next.outDiff === 0 ? {} : { out: currentTs + next.outDiff })
-      })
+      });
     }
 
     if (next.type === GROUP_TYPE) {
@@ -277,7 +281,7 @@ function decodeFromHeader(bytes, headerIndex) {
     return decodeGroup(bytes, headerIndex);
   }
 
-  throw new Error(`Unknown header data type: ${type}`);
+  throw new Error(`[Clocker Invalid] Unknown data type: ${type}`);
 }
 
 function decodeCheckpoint(bytes, headerIndex) {
