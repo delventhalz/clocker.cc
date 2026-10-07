@@ -8,10 +8,10 @@ The basic proof of concept is available online.
 
 https://clocker.cc
 
-Clock in and clock out. The times are displayed in a standard ISO date string.
-Importantly, the data is all stored within the URL. This allows you to transfer
-your data from one device to another simply by copying and pasting the web
-address. There is no server looking at your data.
+Clock in and clock out. Times are displayed in a list below. Importantly,
+the data is all stored within the URL. This allows you to transfer your data
+from one device to another simply by copying and pasting the web address.
+There is no server.
 
 ## Run
 

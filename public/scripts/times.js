@@ -6,9 +6,9 @@ export function Times() {
 
   return h('div', null,
     h('ul', null, times.map(t => {
-      const inStr = new Date(t.in).toISOString();
-      const outStr = t.out === undefined ? '' : new Date(t.out).toISOString();
-      return h('li', null, `${inStr} | ${outStr}`);
+      const inStr = new Date(t.in).toLocaleString();
+      const outStr = t.out === undefined ? '' : new Date(t.out).toLocaleString();
+      return h('li', null, `${inStr} — ${outStr}`);
     }))
   );
 }
