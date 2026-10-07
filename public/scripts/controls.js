@@ -1,5 +1,4 @@
 import { h } from 'preact';
-import { useEffect } from 'preact/hooks';
 import { useClockerContext } from './context.js';
 
 export function Controls() {
@@ -10,10 +9,6 @@ export function Controls() {
     clockIn,
     clockOut
   } = useClockerContext();
-
-  useEffect(() => {
-    addGroup('Test Group');
-  }, []);
 
   const isClockedIn = getActiveTimes().length > 0;
 
